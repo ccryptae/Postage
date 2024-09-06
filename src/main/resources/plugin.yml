@@ -1,4 +1,12 @@
 name: Postage
 version: '1.0-SNAPSHOT'
 main: com.cryptae.postage.Postage
+author: Cryptae
 api-version: '1.20'
+folia-compatible: true
+
+commands:
+  postage:
+    description: Opens the postage sending GUI
+  delivery:
+    description: Opens the delivery GUI

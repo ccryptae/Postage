@@ -9,6 +9,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 public class DeliveryStorage {
@@ -16,44 +17,41 @@ public class DeliveryStorage {
     private final FileConfiguration deliveryConfig;
 
     public DeliveryStorage(JavaPlugin plugin) {
-        deliveryFile = new File(plugin.getDataFolder(), "deliveries.yml");
+        this.deliveryFile = new File(plugin.getDataFolder(), "deliveries.yml");
+
         if (!deliveryFile.exists()) {
-            try {
-                deliveryFile.createNewFile();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            plugin.saveResource("deliveries.yml", false); // Save default file if it doesn't exist
         }
-        deliveryConfig = YamlConfiguration.loadConfiguration(deliveryFile);
+
+        this.deliveryConfig = YamlConfiguration.loadConfiguration(deliveryFile);
     }
 
     public void saveDelivery(UUID recipientUUID, Map<Integer, ItemStack> items) {
+        FileConfiguration config = YamlConfiguration.loadConfiguration(deliveryFile);
         String path = "deliveries." + recipientUUID.toString();
-        deliveryConfig.set(path, null); // Clear old data
-
         for (Map.Entry<Integer, ItemStack> entry : items.entrySet()) {
-            deliveryConfig.set(path + "." + entry.getKey(), entry.getValue());
+            config.set(path + "." + entry.getKey(), entry.getValue());
         }
-
         saveConfig();
     }
 
-    public Map<Integer, ItemStack> loadDelivery(UUID recipientUUID) {
-        String path = "deliveries." + recipientUUID.toString();
+    public Map<Integer, ItemStack> loadDeliveries(UUID recipientUUID) {
+        FileConfiguration config = YamlConfiguration.loadConfiguration(deliveryFile);
         Map<Integer, ItemStack> items = new HashMap<>();
-
-        if (deliveryConfig.contains(path)) {
-            for (String key : deliveryConfig.getConfigurationSection(path).getKeys(false)) {
-                ItemStack item = deliveryConfig.getItemStack(path + "." + key);
+        String path = "deliveries." + recipientUUID.toString();
+        if (config.contains(path)) {
+            for (String key : Objects.requireNonNull(config.getConfigurationSection(path)).getKeys(false)) {
+                ItemStack item = config.getItemStack(path + "." + key);
                 items.put(Integer.parseInt(key), item);
             }
         }
-
         return items;
     }
 
     public void removeDelivery(UUID recipientUUID) {
-        deliveryConfig.set("deliveries." + recipientUUID.toString(), null);
+        FileConfiguration config = YamlConfiguration.loadConfiguration(deliveryFile);
+        String path = "deliveries." + recipientUUID.toString();
+        config.set(path, null);
         saveConfig();
     }
 
