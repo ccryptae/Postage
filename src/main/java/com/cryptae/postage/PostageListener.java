@@ -7,6 +7,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -35,50 +36,52 @@ public class PostageListener implements Listener {
 
         if (clickedItem == null || clickedItem.getType().isAir()) return;
 
-        // Check if the clicked item is a placeholder or button
-        if (isPlaceholderItem(clickedItem)) {
-            event.setCancelled(true); // Prevent interaction with placeholders and buttons
+        boolean isPlaceholder = isPlaceholderItem(clickedItem);
+
+        if (title.startsWith("Send Items to ") || title.equals("Your Deliveries")) {
+            if (isPlaceholder) {
+                if (clickedItem.getType() == Material.GREEN_CONCRETE && "Send Items".equals(clickedItem.getItemMeta().getDisplayName())) {
+                    event.setCancelled(true); // Prevent further interaction
+                    // Collect items to send
+                    Map<Integer, ItemStack> items = new HashMap<>();
+                    for (int i = 0; i < clickedInventory.getSize(); i++) {
+                        ItemStack item = clickedInventory.getItem(i);
+                        if (item != null && item.getType() != Material.AIR) {
+                            items.put(i, item);
+                        }
+                    }
+
+                    String recipientName = title.substring("Send Items to ".length());
+                    OfflinePlayer recipient = Bukkit.getOfflinePlayer(recipientName);
+
+                    deliveryStorage.saveDelivery(recipient.getUniqueId(), items);
+                    player.sendMessage("Items sent successfully!");
+                    player.closeInventory();
+                } else if (clickedItem.getType() == Material.RED_CONCRETE && "Cancel".equals(clickedItem.getItemMeta().getDisplayName())) {
+                    event.setCancelled(true); // Prevent further interaction
+                    postageCommand.restorePlayerItems(player);
+                    player.closeInventory();
+                } else if (clickedItem.getType() == Material.RED_CONCRETE && "Close".equals(clickedItem.getItemMeta().getDisplayName())) {
+                    event.setCancelled(true); // Prevent further interaction
+                    player.closeInventory();
+                }
+                if (isPlaceholder) {
+                    event.setCancelled(true); // Prevent interaction with placeholders
+                }
+            }
             return;
         }
+    }
 
+    @EventHandler
+    public void onInventoryClose(InventoryCloseEvent event) {
+        if (event.getInventory() == null || !(event.getPlayer() instanceof Player)) return;
+
+        Player player = (Player) event.getPlayer();
+        String title = event.getView().getTitle();
         if (title.startsWith("Send Items to ")) {
-            // Allow moving items to the inventory if it's not a placeholder
-            if (event.getRawSlot() >= 0 && event.getRawSlot() < 45) {
-                // Allow moving items in the GUI slots
-                return;
-            }
-
-            // Handle the button actions
-            if (clickedItem.getType() == Material.GREEN_CONCRETE && clickedItem.getItemMeta().getDisplayName().equals("Send Items")) {
-                event.setCancelled(true); // Prevent further interaction
-                // Collect items to send
-                Map<Integer, ItemStack> items = new HashMap<>();
-                for (int i = 0; i < clickedInventory.getSize(); i++) {
-                    ItemStack item = clickedInventory.getItem(i);
-                    if (item != null && item.getType() != Material.AIR) {
-                        items.put(i, item);
-                    }
-                }
-
-                String recipientName = title.substring("Send Items to ".length());
-                OfflinePlayer recipient = Bukkit.getOfflinePlayer(recipientName);
-
-                deliveryStorage.saveDelivery(recipient.getUniqueId(), items);
-                player.sendMessage("Items sent successfully!");
-                player.closeInventory();
-            } else if (clickedItem.getType() == Material.RED_CONCRETE && clickedItem.getItemMeta().getDisplayName().equals("Cancel")) {
-                event.setCancelled(true); // Prevent further interaction
-                // Restore player items and close inventory
-                postageCommand.restorePlayerItems(player);
-                player.closeInventory();
-            }
-            event.setCancelled(true); // Prevent further interaction
-        } else if (title.equals("Your Deliveries")) {
-            if (clickedItem.getType() == Material.RED_CONCRETE && clickedItem.getItemMeta().getDisplayName().equals("Close")) {
-                event.setCancelled(true); // Prevent further interaction
-                player.closeInventory();
-            }
-            event.setCancelled(true); // Prevent further interaction
+            // Restore player items if GUI was closed without pressing a button
+            postageCommand.restorePlayerItems(player);
         }
     }
 
@@ -88,9 +91,8 @@ public class PostageListener implements Listener {
         ItemMeta meta = item.getItemMeta();
         if (meta == null) return false;
 
-        // Check for placeholder types
         return item.getType() == Material.GRAY_STAINED_GLASS_PANE ||
-                item.getType() == Material.GREEN_CONCRETE ||
-                item.getType() == Material.RED_CONCRETE;
+                (item.getType() == Material.GREEN_CONCRETE && "Send Items".equals(meta.getDisplayName())) ||
+                (item.getType() == Material.RED_CONCRETE && ("Cancel".equals(meta.getDisplayName()) || "Close".equals(meta.getDisplayName())));
     }
 }

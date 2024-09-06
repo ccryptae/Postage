@@ -17,7 +17,7 @@ import java.util.Map;
 
 public class PostageCommand implements CommandExecutor {
     private final DeliveryStorage deliveryStorage;
-    private final Map<Player, Map<Integer, ItemStack>> playerOriginalItems = new HashMap<>();
+    private final Map<Player, Map<Integer, ItemStack>> playerOriginalInventory = new HashMap<>();
 
     public PostageCommand(JavaPlugin plugin) {
         this.deliveryStorage = new DeliveryStorage(plugin);
@@ -39,15 +39,15 @@ public class PostageCommand implements CommandExecutor {
                 return false;
             }
 
-            // Save player's current inventory
-            Map<Integer, ItemStack> originalItems = new HashMap<>();
+            // Track the original inventory
+            Map<Integer, ItemStack> originalInventory = new HashMap<>();
             for (int i = 0; i < player.getInventory().getSize(); i++) {
                 ItemStack item = player.getInventory().getItem(i);
                 if (item != null && item.getType() != Material.AIR) {
-                    originalItems.put(i, item.clone());
+                    originalInventory.put(i, item.clone());
                 }
             }
-            playerOriginalItems.put(player, originalItems);
+            playerOriginalInventory.put(player, originalInventory);
 
             Inventory sendingGui = GuiManager.createSendingInventory(recipientName);
             player.openInventory(sendingGui);
@@ -57,9 +57,13 @@ public class PostageCommand implements CommandExecutor {
     }
 
     public void restorePlayerItems(Player player) {
-        Map<Integer, ItemStack> originalItems = playerOriginalItems.remove(player);
-        if (originalItems != null) {
-            for (Map.Entry<Integer, ItemStack> entry : originalItems.entrySet()) {
+        // Only restore items if the player has original inventory saved
+        if (playerOriginalInventory.containsKey(player)) {
+            Map<Integer, ItemStack> originalInventory = playerOriginalInventory.remove(player);
+            // Clear the player's current inventory first
+            player.getInventory().clear();
+            // Restore original inventory items
+            for (Map.Entry<Integer, ItemStack> entry : originalInventory.entrySet()) {
                 player.getInventory().setItem(entry.getKey(), entry.getValue());
             }
         }
